@@ -1,18 +1,86 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
+set(NAME "Paraglider")
+set(VERSION 1.6.0)
+set(AE_VERSION 1)
 
-set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
-set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
+# ---- Options ----
+
+option(COPY_BUILD "Copy the build output to the Skyrim directory." TRUE)
+option(BUILD_SKYRIMAE "Build for Skyrim AE" OFF)
+
+# ---- Cache build vars ----
+
+macro(set_from_environment VARIABLE)
+	if (NOT DEFINED ${VARIABLE} AND DEFINED ENV{${VARIABLE}})
+		set(${VARIABLE} $ENV{${VARIABLE}})
+	endif ()
+endmacro()
+
+set_from_environment(VCPKG_ROOT)
+
+macro(find_commonlib_path)
+	if (CommonLibName AND NOT ${CommonLibName} STREQUAL "")
+		# Check extern
+		find_path(CommonLibPath
+		include/REL/Relocation.h
+		PATHS extern/${CommonLibName})
+		if (${CommonLibPath} STREQUAL "CommonLibPath-NOTFOUND")
+			#Check path
+			set_from_environment(${CommonLibName}Path)
+			set(CommonLibPath ${${CommonLibName}Path})
+		endif()
+	endif()
+endmacro()
+
+set_from_environment(VCPKG_ROOT)
+if(BUILD_SKYRIMAE)
+	add_compile_definitions(SKYRIM_AE)
+	set(CommonLibName "CommonLibSSE")
+	set_from_environment(SkyrimAEPath)
+	set(SkyrimPath ${SkyrimAEPath})
+	set(SkyrimVersion "Skyrim AE")
+	set(VERSION ${VERSION}.${AE_VERSION})
+else()
+	set(CommonLibName "CommonLibSSE")
+	set_from_environment(Skyrim64Path)
+	set(SkyrimPath ${Skyrim64Path})
+	set(SkyrimVersion "Skyrim SSE")
+endif()
+find_commonlib_path()
+message(
+	STATUS
+	"Building for ${SkyrimVersion} at ${SkyrimPath} with ${CommonLibName} at ${CommonLibPath}."
+)
+
+if (DEFINED VCPKG_ROOT)
+	set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+	set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
+else ()
+	message(
+		WARNING
+		"Variable VCPKG_ROOT is not set. Continuing without vcpkg."
+	)
+endif ()
+
+set(Boost_USE_STATIC_RUNTIME OFF CACHE BOOL "")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "")
 
 # ---- Project ----
 
 project(
-	Paraglider
-	VERSION 1.0.0
+	${NAME}
+	VERSION ${VERSION}
 	LANGUAGES CXX
 )
 
 configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/version.rc.in
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/Version.h.in
+	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
+	@ONLY
+)
+
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in
 	${CMAKE_CURRENT_BINARY_DIR}/version.rc
 	@ONLY
 )
@@ -23,164 +91,177 @@ if(PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
 	message(
 		FATAL_ERROR
 			"In-source builds not allowed. Please make a new directory (called a build directory) and run CMake from there."
-)
+	)
 endif()
 
-# ---- Dependencies ----
+# ---- Globals ----
+
+add_compile_definitions(
+	SKSE_SUPPORT_XBYAK
+)
+
+if (BUILD_SKYRIMAE)
+	add_compile_definitions(
+		SKYRIM_SUPPORT_AE
+	)
+endif()
+
+if (MSVC)
+	if (NOT ${CMAKE_GENERATOR} STREQUAL "Ninja")
+		add_compile_options(
+			/MP	# Build with Multiple Processes
+		)
+	endif ()
+endif ()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG OFF)
 
-set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_STATIC_RUNTIME ON)
-set(Boost_USE_DEBUG_RUNTIME ON)
 
-if (MSVC)
-	add_compile_definitions(
-		_UNICODE
-	)
-	
-	set(COMPILE_OPTIONS_DEBUG
-		/Zc:inline-	# Keep unreferenced COMDAT
-		/JMC	# Just My Code debugging
-	)
-	
-	set(COMPILE_OPTIONS_RELEASE
-		/Zc:inline	# Remove unreferenced COMDAT
-		/JMC-	# Disable Just My Code debugging
-	)
+# ---- Dependencies ----
 
-	add_compile_options(
-		/Gy	# Enable Function-Level Linking
-		/MP	# Build with Multiple Processes
-		/Oi	# Generate Intrinsic Functions
-		/sdl	# Enable Additional Security Checks
-		/Zi	# Debug Information Format
-		
-		/permissive-	# Standards conformance
-		
-		/Zc:alignedNew	# C++17 over-aligned allocation
-		/Zc:auto	# Deduce Variable Type
-		/Zc:char8_t
-		/Zc:__cplusplus	# Enable updated __cplusplus macro
-		/Zc:externC
-		/Zc:externConstexpr	# Enable extern constexpr variables
-		/Zc:forScope	# Force Conformance in for Loop Scope
-		/Zc:hiddenFriend
-		/Zc:implicitNoexcept	# Implicit Exception Specifiers
-		/Zc:lambda
-		/Zc:noexceptTypes	# C++17 noexcept rules
-		/Zc:preprocessor	# Enable preprocessor conformance mode
-		/Zc:referenceBinding	# Enforce reference binding rules
-		/Zc:rvalueCast	# Enforce type conversion rules
-		/Zc:sizedDealloc	# Enable Global Sized Deallocation Functions
-		/Zc:strictStrings	# Disable string literal type conversion
-		/Zc:ternary	# Enforce conditional operator rules
-		/Zc:threadSafeInit	# Thread-safe Local Static Initialization
-		/Zc:tlsGuards
-		/Zc:trigraphs	# Trigraphs Substitution
-		/Zc:wchar_t	# wchar_t Is Native Type
-		
-		/experimental:external
-		/external:anglebrackets
-		/external:W0
-		
-		/W4	# Warning level (all warnings)
-		/WX	# Warning level (warnings are errors)
-		
-		"$<$<CONFIG:Debug>:${COMPILE_OPTIONS_DEBUG}>"
-		"$<$<CONFIG:Release>:${COMPILE_OPTIONS_RELEASE}>"
-	)
-
-	set(LINK_OPTIONS_DEBUG
-		/INCREMENTAL	# Link Incrementally
-		/OPT:NOREF	# Optimizations (keep functions/data never referenced)
-		/OPT:NOICF	# Optimizations (prevent identical COMDAT folding)
-	)
-	
-	set(LINK_OPTIONS_RELEASE
-		/INCREMENTAL:NO	# Link Incrementally
-		/OPT:REF	# Optimizations (eliminate functions/data never referenced)
-		/OPT:ICF	# Optimizations (perform identical COMDAT folding)
-	)
-
-	add_link_options(
-		"$<$<CONFIG:Debug>:${LINK_OPTIONS_DEBUG}>"
-		"$<$<CONFIG:Release>:${LINK_OPTIONS_RELEASE}>"
+if (DEFINED CommonLibPath AND NOT ${CommonLibPath} STREQUAL "" AND IS_DIRECTORY ${CommonLibPath})
+	add_subdirectory(${CommonLibPath} ${CommonLibName})
+else ()
+	message(
+		FATAL_ERROR
+		"Variable ${CommonLibName}Path is not set or in extern/."
 	)
 endif()
 
-add_subdirectory(extern/CommonLibSSE CommonLibSSE)
-
-find_package(spdlog REQUIRED)
-
-find_path(XBYAK_INCLUDE_DIRS "xbyak/xbyak.h")
+find_path(SIMPLEINI_INCLUDE_DIRS "ConvertUTF.c")
 
 # ---- Add source files ----
 
-set(headers
-	src/PCH.h
-)
-
-set(sources
-	src/main.cpp
-	src/PCH.cpp
-)
+include(cmake/headerlist.cmake)
+include(cmake/sourcelist.cmake)
 
 source_group(
-	TREE ${CMAKE_CURRENT_SOURCE_DIR}
+	TREE
+		${CMAKE_CURRENT_SOURCE_DIR}
 	FILES
 		${headers}
 		${sources}
 )
 
+source_group(
+	TREE
+		${CMAKE_CURRENT_BINARY_DIR}
+	FILES
+		${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
+)
+
 # ---- Create DLL ----
 
-add_library(${PROJECT_NAME} SHARED
+add_library(
+	${PROJECT_NAME}
+	SHARED
 	${headers}
 	${sources}
+	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
 	${CMAKE_CURRENT_BINARY_DIR}/version.rc
 	.clang-format
 )
 
-set_property(
-	TARGET
-		${PROJECT_NAME}
-		CommonLibSSE
-	PROPERTY
-		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-)
-
-target_compile_features(${PROJECT_NAME}
-	PUBLIC
-		cxx_std_17
-)
-
-target_compile_options(${PROJECT_NAME}
+target_compile_features(
+	${PROJECT_NAME}
 	PRIVATE
-		"$<$<BOOL:${MSVC}>:/TP>"
+		cxx_std_23
 )
 
-target_include_directories(${PROJECT_NAME}
-	PRIVATE 
-		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-        $<INSTALL_INTERFACE:src>
-        ${XBYAK_INCLUDE_DIRS}
+target_compile_definitions(
+	${PROJECT_NAME}
+	PRIVATE
+		_UNICODE
 )
 
-target_link_libraries(${PROJECT_NAME}
-	PUBLIC
-		CommonLibSSE::CommonLibSSE
-		spdlog::spdlog
+target_include_directories(
+	${PROJECT_NAME}
+	PRIVATE
+		${CMAKE_CURRENT_BINARY_DIR}/include
+		${CMAKE_CURRENT_SOURCE_DIR}/src
+		${SIMPLEINI_INCLUDE_DIRS}
 )
 
-target_link_options(${PROJECT_NAME}
-	PUBLIC
-		${LINK_OPTIONS_${CONFIG}}
+target_link_libraries(
+	${PROJECT_NAME}
+	PRIVATE
+		${CommonLibName}::${CommonLibName}
 )
 
-target_precompile_headers(${PROJECT_NAME}
+target_precompile_headers(
+	${PROJECT_NAME}
 	PRIVATE
 		src/PCH.h
 )
+
+if (MSVC)
+	target_compile_options(
+		${PROJECT_NAME}
+		PRIVATE
+			/sdl	# Enable Additional Security Checks
+			/utf-8	# Set Source and Executable character sets to UTF-8
+			/Zi	# Debug Information Format
+
+			/permissive-	# Standards conformance
+
+			/Zc:alignedNew	# C++17 over-aligned allocation
+			/Zc:auto	# Deduce Variable Type
+			/Zc:char8_t
+			/Zc:__cplusplus	# Enable updated __cplusplus macro
+			/Zc:externC
+			/Zc:externConstexpr	# Enable extern constexpr variables
+			/Zc:forScope	# Force Conformance in for Loop Scope
+			/Zc:hiddenFriend
+			/Zc:implicitNoexcept	# Implicit Exception Specifiers
+			/Zc:lambda
+			/Zc:noexceptTypes	# C++17 noexcept rules
+			/Zc:preprocessor	# Enable preprocessor conformance mode
+			/Zc:referenceBinding	# Enforce reference binding rules
+			/Zc:rvalueCast	# Enforce type conversion rules
+			/Zc:sizedDealloc	# Enable Global Sized Deallocation Functions
+			/Zc:strictStrings	# Disable string literal type conversion
+			/Zc:ternary	# Enforce conditional operator rules
+			/Zc:threadSafeInit	# Thread-safe Local Static Initialization
+			/Zc:tlsGuards
+			/Zc:trigraphs	# Trigraphs Substitution
+			/Zc:wchar_t	# wchar_t Is Native Type
+
+			/external:anglebrackets
+			/external:W0
+
+			/W4	# Warning level
+			/WX	# Warning level (warnings are errors)
+
+			"$<$<CONFIG:DEBUG>:>"
+			"$<$<CONFIG:RELEASE>:/Zc:inline;/JMC-;/Ob3>"
+	)
+
+	target_link_options(
+		${PROJECT_NAME}
+		PRIVATE
+			/WX	# Treat Linker Warnings as Errors
+
+			"$<$<CONFIG:DEBUG>:/INCREMENTAL;/OPT:NOREF;/OPT:NOICF>"
+			"$<$<CONFIG:RELEASE>:/INCREMENTAL:NO;/OPT:REF;/OPT:ICF;/DEBUG:FULL>"
+	)
+endif ()
+
+# ---- Post build ----
+
+if (COPY_BUILD)
+	if (DEFINED SkyrimPath)
+		add_custom_command(
+			TARGET ${PROJECT_NAME}
+			POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${SkyrimPath}/Data/SKSE/Plugins/
+			COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_PDB_FILE:${PROJECT_NAME}> ${SkyrimPath}/Data/SKSE/Plugins/
+		)
+	else ()
+		message(
+			WARNING
+			"Variable ${SkyrimPath} is not defined. Skipping post-build copy command."
+		)
+	endif ()
+endif ()

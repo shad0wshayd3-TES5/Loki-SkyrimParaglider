@@ -1,36 +1,34 @@
 #pragma once
+
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
-//_CRT_SECURE_NO_WARNINGS
-#define TRUEHUD_API_COMMONLIB
-#include <Windows.h>
+
 #include "RE/Skyrim.h"
 #include "SKSE/SKSE.h"
-#include "xbyak/xbyak.h"
-//_CRT_SECURE_NO_WARNINGS;
 
-//#include "C:/dev/steamworks_sdk_152/sdk/public/steam/steam_api.h"
-//#pragma comment(lib, "steam_api64.lib");
-//#define NOMINMAX
-//#include <Windows.h>
-
-#ifdef NDEBUG
+#include "SimpleIni.h"
 #include <spdlog/sinks/basic_file_sink.h>
-#else
-#include <spdlog/sinks/msvc_sink.h>
-#endif
+#include "xbyak/xbyak.h"
+
+#define DLLEXPORT __declspec(dllexport)
+
+namespace logger = SKSE::log;
+
+using namespace std::literals;
+
+namespace stl
+{
+	using namespace SKSE::stl;
+}
 
 #ifdef SKSE_SUPPORT_XBYAK
 [[nodiscard]] void* allocate(Xbyak::CodeGenerator& a_code);
 #endif
 
-using namespace std::literals;
+#ifdef SKYRIM_AE
+#	define OFFSET(se, ae) ae
+#else
+#	define OFFSET(se, ae) se
+#endif
 
-namespace logger = SKSE::log;
-
-#define DLLEXPORT __declspec(dllexport)
-
-namespace stl
-{
-    using nonstd::span;
-    using SKSE::stl::report_and_fail;
-}
+#include "Version.h"

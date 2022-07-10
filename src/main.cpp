@@ -1,48 +1,55 @@
-﻿#include "C:/dev/ExamplePlugin-CommonLibSSE/build/simpleini-master/SimpleIni.h"
-extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface * a_skse, SKSE::PluginInfo * a_info)
-{
-#ifndef NDEBUG
-    auto sink = std::make_shared<spdlog::sinks::msvc_sink_mt>();
+#ifdef SKYRIM_AE
+extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []() {
+	SKSE::PluginVersionData v;
+	v.PluginVersion(Version::MAJOR);
+	v.PluginName("Paraglider");
+	v.AuthorName("LokiWasHere");
+	v.UsesAddressLibrary(true);
+	v.CompatibleVersions({ SKSE::RUNTIME_LATEST });
+
+	return v;
+}();
 #else
+extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a_skse, SKSE::PluginInfo* a_info)
+{
+	a_info->infoVersion = SKSE::PluginInfo::kVersion;
+	a_info->name = Version::PROJECT.data();
+	a_info->version = Version::MAJOR;
+
+	if (a_skse->IsEditor()) {
+		logger::critical("Loaded in editor, marking as incompatible"sv);
+		return false;
+	}
+
+	const auto ver = a_skse->RuntimeVersion();
+	if (ver < SKSE::RUNTIME_1_5_39) {
+		logger::critical(FMT_STRING("Unsupported runtime version {}"), ver.string());
+		return false;
+	}
+
+	return true;
+}
+#endif
+
+void InitializeLog()
+{
     auto path = logger::log_directory();
     if (!path) {
-        return false;
+		stl::report_and_fail("Failed to find standard logging directory"sv);
     }
 
-    *path /= "Paraglider.log"sv;
-    auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
-#endif
+    *path /= fmt::format(FMT_STRING("{}.log"), Version::PROJECT);
+	auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
 
     auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
 
-#ifndef NDEBUG
-    log->set_level(spdlog::level::trace);
-#else
     log->set_level(spdlog::level::info);
     log->flush_on(spdlog::level::info);
-#endif
 
     spdlog::set_default_logger(std::move(log));
     spdlog::set_pattern("%g(%#): [%^%l%$] %v"s);
 
-    logger::info("Paraglider v1.0.0");
-
-    a_info->infoVersion = SKSE::PluginInfo::kVersion;
-    a_info->name = "Paraglider";
-    a_info->version = 1;
-
-    if (a_skse->IsEditor()) {
-        logger::critical("Loaded in editor, marking as incompatible"sv);
-        return false;
-    }
-
-    const auto ver = a_skse->RuntimeVersion();
-    if (ver < SKSE::RUNTIME_1_5_39) {
-        logger::critical(FMT_STRING("Unsupported runtime version {}"), ver.string());
-        return false;
-    }
-
-    return true;
+    logger::info(FMT_STRING("{} v{}"), Version::PROJECT, Version::NAME);
 }
 
 static bool isActivate = FALSE;
@@ -58,7 +65,7 @@ public:
         return &singleton;
     }
 
-    auto ProcessEvent(const RE::TESMagicEffectApplyEvent* a_event, RE::BSTEventSource<RE::TESMagicEffectApplyEvent>* a_eventSource) -> RE::BSEventNotifyControl override {
+    auto ProcessEvent(const RE::TESMagicEffectApplyEvent* a_event, RE::BSTEventSource<RE::TESMagicEffectApplyEvent>*) -> RE::BSEventNotifyControl override {
 
         static RE::EffectSetting* notRevalisGale = NULL;
         static RE::TESDataHandler* dataHandle = NULL;
@@ -100,7 +107,7 @@ public:
         CSimpleIniA ini;
         ini.SetUnicode();
         auto filename = L"Data/SKSE/Plugins/Paraglider.ini";
-        SI_Error rc = ini.LoadFile(filename);
+        [[maybe_unused]] SI_Error rc = ini.LoadFile(filename);
 
         this->FallSpeed = (float)ini.GetDoubleValue("SETTINGS", "fFallSpeed", 0.00f);
         this->GaleSpeed = (float)ini.GetDoubleValue("SETTINGS", "fGaleSpeed", 0.00f);
@@ -120,13 +127,13 @@ public:
 
     static void InstallActivateTrue() {
 
-        REL::Relocation<std::uintptr_t> target{ REL::ID(41346), 0x3C };
-        REL::Relocation<std::uintptr_t> addr{ REL::ID(41346), 0x140 };
+        REL::Relocation<std::uintptr_t> target{ RELOCATION_ID(41346, 42420), OFFSET(0x3C, 0x3C) };
+        REL::Relocation<std::uintptr_t> addr{ RELOCATION_ID(41346, 42420), OFFSET(0x140, 0x142) };
         //Loki_Paraglider LPG;
 
         struct Patch : Xbyak::CodeGenerator {
 
-            Patch(std::uintptr_t a_var, std::uintptr_t a_target) {
+            Patch(std::uintptr_t a_var, [[maybe_unused]] std::uintptr_t a_target) {
 
                 Xbyak::Label ourJmp;
                 Xbyak::Label ActivateIsTrue;
@@ -162,11 +169,10 @@ public:
 
     static void InstallParagliderWatcher() {
 
-        REL::Relocation<std::uintptr_t> ActorUpdate{ REL::ID(39375) };  // +69e580
+        REL::Relocation<std::uintptr_t> ActorUpdate{ RELOCATION_ID(39375, 40447), OFFSET(0x8B4, 0xC1B) };  // 69E580, 6C61B0
 
         auto& trampoline = SKSE::GetTrampoline();
-        _Paraglider = trampoline.write_call<5>(ActorUpdate.address() + 0x8AC + 0x08, Paraglider);
-
+        _Paraglider = trampoline.write_call<5>(ActorUpdate.address(), Paraglider);
     };
 
     static void AddMGEFApplyEventSink() {
@@ -201,7 +207,7 @@ private:
             if (a_this->NotifyAnimationGraph(endPara)) {
                 RE::hkVector4 hkv;
                 a_this->GetCharController()->GetPositionImpl(hkv, false);
-                hkv.quad.m128_f32[2] /= 0.0142875;
+                hkv.quad.m128_f32[2] /= 0.0142875f;
                 a_this->GetCharController()->fallStartHeight = hkv.quad.m128_f32[2];
                 a_this->GetCharController()->fallTime = 0.00f;
             }
@@ -249,6 +255,7 @@ private:
 
 extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface * a_skse)
 {
+    InitializeLog();
     logger::info("Paraglider loaded");
 
     SKSE::Init(a_skse);

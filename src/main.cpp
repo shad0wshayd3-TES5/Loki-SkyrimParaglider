@@ -63,6 +63,21 @@ void InitializeLog()
 	logger::info(FMT_STRING("{} v{}"), Version::PROJECT, Version::NAME);
 }
 
+void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
+{
+	switch (a_msg->type)
+	{
+		case SKSE::MessagingInterface::kDataLoaded:
+			if (auto TESDataHandler = RE::TESDataHandler::GetSingleton())
+			{
+				notRevalisGale = TESDataHandler->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp");
+			}
+			break;
+
+		default:
+			break;
+	}
+}
 
 class MagicEffectApplyEventHandler :
 	public RE::BSTEventSink<RE::TESMagicEffectApplyEvent>
@@ -77,27 +92,20 @@ public:
 	auto ProcessEvent(const RE::TESMagicEffectApplyEvent* a_event, RE::BSTEventSource<RE::TESMagicEffectApplyEvent>*)
 		-> RE::BSEventNotifyControl override
 	{
-		static RE::EffectSetting* notRevalisGale = NULL;
-		static RE::TESDataHandler* dataHandle = NULL;
-
-		if (!dataHandle)
+		if (a_event)
 		{
-			dataHandle = RE::TESDataHandler::GetSingleton();
-			if (dataHandle)
+			if (notRevalisGale)
 			{
-				notRevalisGale = dataHandle->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp");
+				if (a_event->magicEffect == notRevalisGale->formID)
+				{
+					start = 0.00f;
+					progression = 0.00f;
+				}
 			}
-		};
-
-		if (!a_event)
-		{
-			return RE::BSEventNotifyControl::kContinue;
-		}
-		
-		if (a_event->magicEffect == notRevalisGale->formID)
-		{
-			start = 0.00f;
-			progression = 0.00f;
+			else
+			{
+				logger::error("RevalisGale Form not found, is Paraglider.esp loaded?");
+			}
 		}
 
 		return RE::BSEventNotifyControl::kContinue;
@@ -206,18 +214,6 @@ private:
 			lp = new Loki_Paraglider();
 		}
 
-		static RE::EffectSetting* notRevalisGale = NULL;
-		static RE::TESDataHandler* dataHandle = NULL;
-
-		if (!dataHandle)
-		{
-			dataHandle = RE::TESDataHandler::GetSingleton();
-			if (dataHandle)
-			{
-				notRevalisGale = dataHandle->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp");
-			}
-		};
-
 		if (!isActivate)
 		{
 			isParagliding = FALSE;
@@ -293,6 +289,12 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Load(const SKSE::LoadInterface* a_s
 
 	SKSE::Init(a_skse);
 	SKSE::AllocTrampoline(128);
+
+	const auto messaging = SKSE::GetMessagingInterface();
+	if (messaging)
+	{
+		messaging->RegisterListener("SKSE", MessageHandler);
+	}
 
 	Loki_Paraglider::InstallActivateTrue();
 	Loki_Paraglider::InstallParagliderWatcher();

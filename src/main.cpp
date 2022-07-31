@@ -34,50 +34,53 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 }
 #endif
 
-static RE::EffectSetting* notRevalisGale{ nullptr };
+static RE::EffectSetting* NotRevalisGale{ nullptr };
 
-static bool isActivate{ false };
-static bool isParagliding{ false };
-static float progression{ 0.0f };
-static float start{ 0.0f };
-
-void InitializeLog()
+namespace
 {
-	auto path = logger::log_directory();
-	if (!path)
+	void InitializeLog()
 	{
-		stl::report_and_fail("Failed to find standard logging directory"sv);
+		auto path = logger::log_directory();
+		if (!path)
+		{
+			stl::report_and_fail("Failed to find standard logging directory"sv);
+		}
+
+		*path /= fmt::format(FMT_STRING("{}.log"), Version::PROJECT);
+		auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
+
+		auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
+
+		log->set_level(spdlog::level::info);
+		log->flush_on(spdlog::level::info);
+
+		spdlog::set_default_logger(std::move(log));
+		spdlog::set_pattern("%g(%#): [%^%l%$] %v"s);
+
+		logger::info(FMT_STRING("{} v{}"), Version::PROJECT, Version::NAME);
 	}
 
-	*path /= fmt::format(FMT_STRING("{}.log"), Version::PROJECT);
-	auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
-
-	auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
-
-	log->set_level(spdlog::level::info);
-	log->flush_on(spdlog::level::info);
-
-	spdlog::set_default_logger(std::move(log));
-	spdlog::set_pattern("%g(%#): [%^%l%$] %v"s);
-
-	logger::info(FMT_STRING("{} v{}"), Version::PROJECT, Version::NAME);
-}
-
-void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
-{
-	switch (a_msg->type)
+	void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
 	{
-		case SKSE::MessagingInterface::kDataLoaded:
-			if (auto TESDataHandler = RE::TESDataHandler::GetSingleton())
-			{
-				notRevalisGale = TESDataHandler->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp");
-			}
-			break;
+		switch (a_msg->type)
+		{
+			case SKSE::MessagingInterface::kDataLoaded:
+				if (auto TESDataHandler = RE::TESDataHandler::GetSingleton())
+				{
+					NotRevalisGale = TESDataHandler->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp");
+				}
+				break;
 
-		default:
-			break;
+			default:
+				break;
+		}
 	}
 }
+
+static bool bIsActivate{ false };
+static bool bIsParagliding{ false };
+static float fStart{ 0.0f };
+static float fProgression{ 0.0f };
 
 class MagicEffectApplyEventHandler :
 	public RE::BSTEventSink<RE::TESMagicEffectApplyEvent>
@@ -94,12 +97,12 @@ public:
 	{
 		if (a_event)
 		{
-			if (notRevalisGale)
+			if (NotRevalisGale)
 			{
-				if (a_event->magicEffect == notRevalisGale->formID)
+				if (a_event->magicEffect == NotRevalisGale->formID)
 				{
-					start = 0.00f;
-					progression = 0.00f;
+					fStart = 0.00f;
+					fProgression = 0.00f;
 				}
 			}
 			else
@@ -125,6 +128,7 @@ class Loki_Paraglider
 {
 public:
 	float FallSpeed, GaleSpeed;
+
 	Loki_Paraglider()
 	{
 		CSimpleIniA ini;
@@ -163,7 +167,7 @@ public:
 
 				mov(byte[rcx + 0x18], 0x1);
 				push(rax);
-				mov(rax, (uintptr_t)&isActivate);
+				mov(rax, (uintptr_t)&bIsActivate);
 				cmp(byte[rax], 0x1);
 				je(ActivateIsTrue);
 				mov(byte[rax], 0x1);
@@ -214,9 +218,9 @@ private:
 			lp = new Loki_Paraglider();
 		}
 
-		if (!isActivate)
+		if (!bIsActivate)
 		{
-			isParagliding = FALSE;
+			bIsParagliding = false;
 			const RE::BSFixedString endPara = "EndPara";
 			if (a_this->NotifyAnimationGraph(endPara))
 			{
@@ -227,8 +231,8 @@ private:
 				a_this->GetCharController()->fallTime = 0.00f;
 			}
 
-			progression = 0.00f;
-			start = 0.00f;
+			fStart = 0.00f;
+			fProgression = 0.00f;
 			return;
 		}
 		else
@@ -236,32 +240,33 @@ private:
 			const RE::BSFixedString startPara = "StartPara";
 			int hasIt;
 			a_this->GetGraphVariableInt("hasparaglider", hasIt);
+			
 			if (hasIt)
 			{
 				if (a_this->NotifyAnimationGraph(startPara))
 				{
-					isParagliding = TRUE;
+					bIsParagliding = true;
 				}
 
-				if (isParagliding)
+				if (bIsParagliding)
 				{
 					RE::hkVector4 hkv;
 					a_this->GetCharController()->GetLinearVelocityImpl(hkv);
-					if (start == 0.0f)
+					if (fStart == 0.0f)
 					{
-						start = hkv.quad.m128_f32[2];
+						fStart = hkv.quad.m128_f32[2];
 					}
 
 					float dest = lp->FallSpeed;
-					if (a_this->HasMagicEffect(notRevalisGale))
+					if (a_this->HasMagicEffect(NotRevalisGale))
 					{
 						dest = lp->GaleSpeed;
 					}
 
-					auto a_result = Loki_Paraglider::lerp(start, dest, progression);
-					if (progression < 1.00f)
+					auto a_result = Loki_Paraglider::lerp(fStart, dest, fProgression);
+					if (fProgression < 1.00f)
 					{
-						(a_this->HasMagicEffect(notRevalisGale)) ? progression += 0.01f : progression += 0.025f;
+						(a_this->HasMagicEffect(NotRevalisGale)) ? fProgression += 0.01f : fProgression += 0.025f;
 					}
 
 					hkv.quad.m128_f32[2] = a_result;
@@ -270,8 +275,8 @@ private:
 
 				if (a_this->GetCharController()->context.currentState == RE::hkpCharacterStateType::kOnGround)
 				{
-					isParagliding = FALSE;
-					isActivate = FALSE;
+					bIsActivate = false;
+					bIsParagliding = false;
 				}
 			}
 		}

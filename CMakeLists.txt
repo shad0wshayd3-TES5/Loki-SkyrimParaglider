@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 set(NAME "Paraglider")
-set(VERSION 1.6.0)
+set(VERSION 1.7.0)
 set(AE_VERSION 1)
 
 # ---- Options ----

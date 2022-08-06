@@ -86,7 +86,7 @@ namespace
 						if (!LokiParaglider::NotRevalisGale)
 						{
 							logger::error("Failed to find NotRevalisGaleMGEF."sv);
-							RE::DebugMessageBox("Warning: Paragliding.esp is either not loaded, or has been modified.\nTarhiel's Gale will not work until you fix this.\n\nReinstall the mod and ensure it's enabled in your mod manager."sv);
+							RE::DebugMessageBox("Warning: Paragliding.esp is either not loaded, or has been modified.\nTarhiel's Gale will not work until you fix this.\n\nReinstall the mod and ensure it's enabled in your mod manager.");
 						}
 					}
 

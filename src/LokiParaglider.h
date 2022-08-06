@@ -29,6 +29,7 @@ public:
 		InstallActivateHook();
 		InstallParagliderWatcher();
 		InstallMGEFApplyEventSink();
+		InstallProcessEventHook();
 	}
 
 	inline static bool bIsActivate{ false };
@@ -38,6 +39,7 @@ public:
 	inline static float fStart{ 0.0f };
 	inline static float fProgression{ 0.0f };
 	inline static RE::EffectSetting* NotRevalisGale{ nullptr };
+	inline static RE::TESObjectMISC* ParagliderForm{ nullptr };
 
 private:
 	static void InstallActivateHook()
@@ -94,6 +96,11 @@ private:
 		}
 	}
 
+	static void InstallProcessEventHook()
+	{
+		REL::Relocation<std::uintptr_t> target{ RE::VTABLE_SkyrimVM[47] };
+		_ProcessEventSRCE = target.write_vfunc(0x01, reinterpret_cast<std::uintptr_t>(ProcessEventSRCE));
+	}
 
 #ifdef SKYRIM_SUPPORT_AE
 	static bool Paraglider(float a_arg1)
@@ -177,7 +184,27 @@ private:
 		}
 	}
 
+	static RE::BSEventNotifyControl ProcessEventSRCE(const RE::TESSwitchRaceCompleteEvent* a_event, RE::BSTEventSource<RE::TESSwitchRaceCompleteEvent>* a_source)
+	{
+		if (ParagliderForm)
+		{
+			if (auto PlayerCharacter = RE::PlayerCharacter::GetSingleton())
+			{
+				if (PlayerCharacter->GetInventory([&](RE::TESBoundObject& a_item) { return a_item.formID == ParagliderForm->formID; }).size())
+				{
+					PlayerCharacter->SetGraphVariableInt("hasparaglider"sv, 1);
+				}
+				else
+				{
+					PlayerCharacter->SetGraphVariableInt("hasparaglider"sv, 0);
+				}
+			}
+		}
 
+		return _ProcessEventSRCE(a_event, a_source);
+	}
+
+private:
 	static void* CodeAllocation(Xbyak::CodeGenerator& a_code, SKSE::Trampoline* t_ptr)
 	{
 		auto result = t_ptr->allocate(a_code.getSize());
@@ -191,6 +218,7 @@ private:
 	}
 
 	inline static REL::Relocation<decltype(Paraglider)> _Paraglider;
+	inline static REL::Relocation<decltype(ProcessEventSRCE)> _ProcessEventSRCE;
 
 protected:
 	LokiParaglider() = default;

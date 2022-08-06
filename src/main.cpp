@@ -65,30 +65,38 @@ namespace
 		switch (a_msg->type)
 		{
 			case SKSE::MessagingInterface::kDataLoaded:
+				// load settings
+				{
+					CSimpleIniA ini;
+					ini.SetUnicode();
+					auto filename = L"Data/SKSE/Plugins/Paraglider.ini";
+					[[maybe_unused]] SI_Error rc = ini.LoadFile(filename);
+
+					LokiParaglider::fFallSpeed = (float)ini.GetDoubleValue("SETTINGS", "fFallSpeed", 0.0f);
+					LokiParaglider::fGaleSpeed = (float)ini.GetDoubleValue("SETTINGS", "fGaleSpeed", 0.0f);
+				}
+
+				// load forms
 				if (auto TESDataHandler = RE::TESDataHandler::GetSingleton())
 				{
-					// load settings
+					LokiParaglider::NotRevalisGale = TESDataHandler->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp"sv);
+					if (!LokiParaglider::NotRevalisGale)
 					{
-						CSimpleIniA ini;
-						ini.SetUnicode();
-						auto filename = L"Data/SKSE/Plugins/Paraglider.ini";
-						[[maybe_unused]] SI_Error rc = ini.LoadFile(filename);
-
-						LokiParaglider::fFallSpeed = (float)ini.GetDoubleValue("SETTINGS", "fFallSpeed", 0.0f);
-						LokiParaglider::fGaleSpeed = (float)ini.GetDoubleValue("SETTINGS", "fGaleSpeed", 0.0f);
-					}
-					
-					// load form
-					{
-						LokiParaglider::NotRevalisGale = TESDataHandler->LookupForm<RE::EffectSetting>(0x10C68, "Paragliding.esp"sv);
+						LokiParaglider::NotRevalisGale = RE::TESForm::LookupByEditorID<RE::EffectSetting>("NotRevalisGaleMGEF"sv);
 						if (!LokiParaglider::NotRevalisGale)
 						{
-							LokiParaglider::NotRevalisGale = RE::TESForm::LookupByEditorID<RE::EffectSetting>("NotRevalisGaleMGEF"sv);
-							if (!LokiParaglider::NotRevalisGale)
-							{
-								logger::error("Failed to find NotRevalisGaleMGEF."sv);
-								RE::DebugMessageBox("Warning: Paragliding.esp is either not loaded, or has been modified.\nTarhiel's Gale will not work until you fix this.\n\nReinstall the mod and ensure it's enabled in your mod manager."sv);
-							}
+							logger::error("Failed to find NotRevalisGaleMGEF."sv);
+							RE::DebugMessageBox("Warning: Paragliding.esp is either not loaded, or has been modified.\nTarhiel's Gale will not work until you fix this.\n\nReinstall the mod and ensure it's enabled in your mod manager."sv);
+						}
+					}
+
+					LokiParaglider::ParagliderForm = TESDataHandler->LookupForm<RE::TESObjectMISC>(0x00802, "Paragliding.esp"sv);
+					if (!LokiParaglider::ParagliderForm)
+					{
+						LokiParaglider::ParagliderForm = RE::TESForm::LookupByEditorID<RE::TESObjectMISC>("Paraglider_gnd"sv);
+						if (!LokiParaglider::ParagliderForm)
+						{
+							logger::warn("Failed to find ParagliderForm."sv);
 						}
 					}
 				}

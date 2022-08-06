@@ -26,7 +26,7 @@ public:
 
 	static void InstallHooks()
 	{
-		InstallActivateTrue();
+		InstallActivateHook();
 		InstallParagliderWatcher();
 		InstallMGEFApplyEventSink();
 	}
@@ -40,7 +40,7 @@ public:
 	inline static RE::EffectSetting* NotRevalisGale{ nullptr };
 
 private:
-	static void InstallActivateTrue()
+	static void InstallActivateHook()
 	{
 		REL::Relocation<std::uintptr_t> targ{ RELOCATION_ID(41346, 42420), OFFSET(0x03C, 0x03C) };
 		REL::Relocation<std::uintptr_t> addr{ RELOCATION_ID(41346, 42420), OFFSET(0x140, 0x142) };
@@ -80,7 +80,7 @@ private:
 
 	static void InstallParagliderWatcher()
 	{
-		REL::Relocation<std::uintptr_t> ActorUpdate{ RELOCATION_ID(39375, 40447), OFFSET(0x8B4, 0xC1B) };  // 69E580, 6C61B0
+		REL::Relocation<std::uintptr_t> ActorUpdate{ RELOCATION_ID(39375, 40447), OFFSET(0x8B4, 0xF63) };  // 69E580, 6C61B0
 
 		auto& trampoline = SKSE::GetTrampoline();
 		_Paraglider = trampoline.write_call<5>(ActorUpdate.address(), Paraglider);
@@ -94,20 +94,40 @@ private:
 		}
 	}
 
+
+#ifdef SKYRIM_SUPPORT_AE
+	static bool Paraglider(float a_arg1)
+	{
+		ParagliderLogic();
+		return _Paraglider(a_arg1);
+	}
+
+#else
 	static void Paraglider(RE::Actor* a_this)
 	{
 		_Paraglider(a_this);
+		return ParagliderLogic();
+	};
+#endif
+
+	static void ParagliderLogic()
+	{
+		auto PlayerCharacter = RE::PlayerCharacter::GetSingleton();
+		if (!PlayerCharacter)
+		{
+			return;
+		}
 
 		if (!bIsActivate)
 		{
 			bIsParagliding = false;
-			if (a_this->NotifyAnimationGraph("EndPara"sv))
+			if (PlayerCharacter->NotifyAnimationGraph("EndPara"sv))
 			{
 				RE::hkVector4 hkv;
-				a_this->GetCharController()->GetPositionImpl(hkv, false);
+				PlayerCharacter->GetCharController()->GetPositionImpl(hkv, false);
 				hkv.quad.m128_f32[2] /= 0.0142875f;
-				a_this->GetCharController()->fallStartHeight = hkv.quad.m128_f32[2];
-				a_this->GetCharController()->fallTime = 0.0f;
+				PlayerCharacter->GetCharController()->fallStartHeight = hkv.quad.m128_f32[2];
+				PlayerCharacter->GetCharController()->fallTime = 0.0f;
 			}
 
 			fStart = 0.0f;
@@ -117,11 +137,11 @@ private:
 		else
 		{
 			std::int32_t HasParaglider{ 0 };
-			a_this->GetGraphVariableInt("hasparaglider", HasParaglider);
+			PlayerCharacter->GetGraphVariableInt("hasparaglider"sv, HasParaglider);
 
 			if (HasParaglider)
 			{
-				if (a_this->NotifyAnimationGraph("StartPara"sv))
+				if (PlayerCharacter->NotifyAnimationGraph("StartPara"sv))
 				{
 					bIsParagliding = true;
 				}
@@ -129,13 +149,13 @@ private:
 				if (bIsParagliding)
 				{
 					RE::hkVector4 hkv;
-					a_this->GetCharController()->GetLinearVelocityImpl(hkv);
+					PlayerCharacter->GetCharController()->GetLinearVelocityImpl(hkv);
 					if (fStart == 0.0f)
 					{
 						fStart = hkv.quad.m128_f32[2];
 					}
 
-					bool bHasEffect = a_this->HasMagicEffect(NotRevalisGale);
+					bool bHasEffect = PlayerCharacter->HasMagicEffect(NotRevalisGale);
 
 					float fSpeed = bHasEffect ? fGaleSpeed : fFallSpeed;
 					float fValue = lerp(fStart, fSpeed, fProgression);
@@ -145,19 +165,18 @@ private:
 					}
 
 					hkv.quad.m128_f32[2] = fValue;
-					a_this->GetCharController()->SetLinearVelocityImpl(hkv);
+					PlayerCharacter->GetCharController()->SetLinearVelocityImpl(hkv);
 				}
 
-				if (a_this->GetCharController()->context.currentState == RE::hkpCharacterStateType::kOnGround)
+				if (PlayerCharacter->GetCharController()->context.currentState == RE::hkpCharacterStateType::kOnGround)
 				{
 					bIsActivate = false;
 					bIsParagliding = false;
 				}
 			}
 		}
+	}
 
-		return;
-	};
 
 	static void* CodeAllocation(Xbyak::CodeGenerator& a_code, SKSE::Trampoline* t_ptr)
 	{
@@ -171,7 +190,7 @@ private:
 		return a + f * (b - a);
 	}
 
-	static inline REL::Relocation<decltype(Paraglider)> _Paraglider;
+	inline static REL::Relocation<decltype(Paraglider)> _Paraglider;
 
 protected:
 	LokiParaglider() = default;

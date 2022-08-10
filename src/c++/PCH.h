@@ -6,9 +6,9 @@
 #include "RE/Skyrim.h"
 #include "SKSE/SKSE.h"
 
-#include "SimpleIni.h"
-#include "xbyak/xbyak.h"
+#include <SimpleIni.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <xbyak/xbyak.h>
 
 #define DLLEXPORT __declspec(dllexport)
 
@@ -19,11 +19,9 @@ using namespace std::literals;
 namespace stl
 {
 	using namespace SKSE::stl;
-}
 
-#ifdef SKSE_SUPPORT_XBYAK
-[[nodiscard]] void* allocate(Xbyak::CodeGenerator& a_code);
-#endif
+//	[[nodiscard]] void* allocate(Xbyak::CodeGenerator& a_code);
+}
 
 #ifdef SKYRIM_AE
 #	define OFFSET(se, ae) ae

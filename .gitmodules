@@ -2,3 +2,6 @@
 	path = extern/CommonLibSSE
 	url = https://github.com/powerof3/CommonLibSSE.git
 	branch = dev
+[submodule "extern/BethesdaCMakeModules"]
+	path = extern/BethesdaCMakeModules
+	url = https://github.com/shad0wshayd3/BethesdaCMakeModules.git

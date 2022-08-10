@@ -5,7 +5,7 @@ extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []()
 {
 	SKSE::PluginVersionData v;
 	v.PluginVersion(Version::MAJOR);
-	v.PluginName("Paraglider");
+	v.PluginName(Version::PROJECT);
 	v.AuthorName("LokiWasHere");
 	v.UsesAddressLibrary(true);
 	v.CompatibleVersions({ SKSE::RUNTIME_LATEST });
@@ -46,7 +46,7 @@ namespace
 			stl::report_and_fail("Failed to find standard logging directory"sv);
 		}
 
-		*path /= fmt::format(FMT_STRING("{}.log"), Version::PROJECT);
+		*path /= fmt::format(FMT_STRING("{:s}.log"), Version::PROJECT);
 		auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
 
 		auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
@@ -57,7 +57,7 @@ namespace
 		spdlog::set_default_logger(std::move(log));
 		spdlog::set_pattern("%g(%#): [%^%l%$] %v"s);
 
-		logger::info(FMT_STRING("{} v{}"), Version::PROJECT, Version::NAME);
+		logger::info(FMT_STRING("{:s} v{:s}"), Version::PROJECT, Version::NAME);
 	}
 
 	void MessageHandler(SKSE::MessagingInterface::Message* a_msg)
@@ -85,7 +85,7 @@ namespace
 						LokiParaglider::NotRevalisGale = RE::TESForm::LookupByEditorID<RE::EffectSetting>("NotRevalisGaleMGEF"sv);
 						if (!LokiParaglider::NotRevalisGale)
 						{
-							logger::error("Failed to find NotRevalisGaleMGEF."sv);
+							logger::error("Failed to find NotRevalisGaleMGEF.");
 							RE::DebugMessageBox("Warning: Paragliding.esp is either not loaded, or has been modified.\nTarhiel's Gale will not work until you fix this.\n\nReinstall the mod and ensure it's enabled in your mod manager.");
 						}
 					}
@@ -96,7 +96,7 @@ namespace
 						LokiParaglider::ParagliderForm = RE::TESForm::LookupByEditorID<RE::TESObjectMISC>("Paraglider_gnd"sv);
 						if (!LokiParaglider::ParagliderForm)
 						{
-							logger::warn("Failed to find ParagliderForm."sv);
+							logger::warn("Failed to find ParagliderForm.");
 						}
 					}
 				}

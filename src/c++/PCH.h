@@ -20,7 +20,7 @@ namespace stl
 {
 	using namespace SKSE::stl;
 
-//	[[nodiscard]] void* allocate(Xbyak::CodeGenerator& a_code);
+	//	[[nodiscard]] void* allocate(Xbyak::CodeGenerator& a_code);
 }
 
 #ifdef SKYRIM_AE

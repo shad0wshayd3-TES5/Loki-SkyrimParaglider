@@ -191,8 +191,8 @@ private:
 			if (auto PlayerCharacter = RE::PlayerCharacter::GetSingleton())
 			{
 				if (PlayerCharacter->GetInventory([&](RE::TESBoundObject& a_item)
-												  { return a_item.formID == ParagliderForm->formID; })
-						.size())
+				                                  { return a_item.formID == ParagliderForm->formID; })
+				        .size())
 				{
 					PlayerCharacter->SetGraphVariableInt("hasparaglider"sv, 1);
 				}

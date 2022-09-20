@@ -7,7 +7,8 @@ extern "C" DLLEXPORT constinit auto SKSEPlugin_Version = []()
 	v.PluginVersion(Version::MAJOR);
 	v.PluginName(Version::PROJECT);
 	v.AuthorName("LokiWasHere");
-	v.UsesAddressLibrary(true);
+	v.UsesAddressLibrary();
+	v.UsesUpdatedStructs();
 	v.CompatibleVersions({ SKSE::RUNTIME_LATEST });
 
 	return v;
@@ -28,7 +29,7 @@ extern "C" DLLEXPORT bool SKSEAPI SKSEPlugin_Query(const SKSE::QueryInterface* a
 	const auto ver = a_skse->RuntimeVersion();
 	if (ver < SKSE::RUNTIME_1_5_39)
 	{
-		logger::critical(FMT_STRING("Unsupported runtime version {}"), ver.string());
+		logger::critical(FMT_STRING("Unsupported runtime version {}"sv), ver.string());
 		return false;
 	}
 
@@ -46,7 +47,7 @@ namespace
 			stl::report_and_fail("Failed to find standard logging directory"sv);
 		}
 
-		*path /= fmt::format(FMT_STRING("{:s}.log"), Version::PROJECT);
+		*path /= fmt::format(FMT_STRING("{:s}.log"sv), Version::PROJECT);
 		auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(path->string(), true);
 
 		auto log = std::make_shared<spdlog::logger>("global log"s, std::move(sink));
@@ -57,7 +58,7 @@ namespace
 		spdlog::set_default_logger(std::move(log));
 		spdlog::set_pattern("%g(%#): [%^%l%$] %v"s);
 
-		logger::info(FMT_STRING("{:s} v{:s}"), Version::PROJECT, Version::NAME);
+		logger::info(FMT_STRING("{:s} v{:s}"sv), Version::PROJECT, Version::NAME);
 	}
 
 	void MessageHandler(SKSE::MessagingInterface::Message* a_msg)

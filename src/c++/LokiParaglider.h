@@ -82,7 +82,7 @@ private:
 
 	static void InstallParagliderWatcher()
 	{
-		REL::Relocation<std::uintptr_t> ActorUpdate{ RELOCATION_ID(39375, 40447), OFFSET(0x8B4, 0xF63) };  // 69E580, 6C61B0
+		REL::Relocation<std::uintptr_t> ActorUpdate{ RELOCATION_ID(39375, 40447), OFFSET(0x8B4, 0xF65) };
 
 		auto& trampoline = SKSE::GetTrampoline();
 		_Paraglider = trampoline.write_call<5>(ActorUpdate.address(), Paraglider);

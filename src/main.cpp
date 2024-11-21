@@ -13,15 +13,15 @@ namespace
 		}
 		case SKSE::MessagingInterface::kDataLoaded:
 			// load settings
-//			{
-//				CSimpleIniA ini;
-//				ini.SetUnicode();
-//				auto filename = L"Data/SKSE/Plugins/Paraglider.ini";
-//				[[maybe_unused]] SI_Error rc = ini.LoadFile(filename);
-//
-//				LokiParaglider::fFallSpeed = (float)ini.GetDoubleValue("SETTINGS", "fFallSpeed", 0.0f);
-//				LokiParaglider::fGaleSpeed = (float)ini.GetDoubleValue("SETTINGS", "fGaleSpeed", 0.0f);
-//			}
+			//			{
+			//				CSimpleIniA ini;
+			//				ini.SetUnicode();
+			//				auto filename = L"Data/SKSE/Plugins/Paraglider.ini";
+			//				[[maybe_unused]] SI_Error rc = ini.LoadFile(filename);
+			//
+			//				LokiParaglider::fFallSpeed = (float)ini.GetDoubleValue("SETTINGS", "fFallSpeed", 0.0f);
+			//				LokiParaglider::fGaleSpeed = (float)ini.GetDoubleValue("SETTINGS", "fGaleSpeed", 0.0f);
+			//			}
 
 			// load forms
 			if (auto TESDataHandler = RE::TESDataHandler::GetSingleton())

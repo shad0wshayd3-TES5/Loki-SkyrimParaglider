@@ -25,6 +25,7 @@ add_rules("plugin.vsxmake.autoupdate")
 
 -- add config
 set_config("rex_ini", true)
+set_config("sfse_xbyak", true)
 set_config("skyrim_ae", true)
 
 -- setup targets
